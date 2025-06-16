@@ -40,9 +40,9 @@ class State:
         self.bed_tripping = False
 
         # Metrics tracking
-        self.outpatients_data = {}
-        self.inpatients_data = {}
-        self.emergency_data = {}
+        self.outpatients_data = {}  # [request time, appointment time, arrival time, waited outside]
+        self.inpatients_data = {}   # [request time, appointment time, arrival time, waited outside]
+        self.emergency_data = {}    # [request time, appointment time, arrival time, waited outside]
         self.emergency_waiting_times = {}
         self.outpatient_waiting_times = {}
         self.outpatient_access_times = {}
