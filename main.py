@@ -40,13 +40,15 @@ class State:
         self.bed_tripping = False
 
         # Metrics tracking
-        self.outpatients_data = {}  # [request time, appointment time, arrival time, waited outside]
-        self.inpatients_data = {}   # [request time, appointment time, arrival time, waited outside]
-        self.emergency_data = {}    # [request time, appointment time, arrival time, waited outside]
+        self.outpatients_data = {}
+        self.inpatients_data = {}
+        self.emergency_data = {}
         self.emergency_waiting_times = {}
         self.outpatient_waiting_times = {}
         self.outpatient_access_times = {}
         self.inpatient_scanned_same_office_hours = {}
+        self.total_waited_outside = 0
+        self.total_inpatient_ssof = 0  # scanned in the same office hour
 
         # Counters
         self.out_counter = 1
@@ -88,6 +90,7 @@ class EmergencyArrival(DES.Event):
         state.waiting_queue.insert(i, current_customer)
         if i > 3:
             current_customer.waited_outside = 1
+            state.total_waited_outside += 1
 
         state.emergency_data[current_customer.counter].append(current_customer.waited_outside)
         DES.insertEvent(EmergencyArrival(self.Time + random.expovariate(1 / 60)))
@@ -126,6 +129,7 @@ class InpatientArrival(DES.Event):
         state.waiting_queue.append(self.customer)
         if len(state.waiting_queue) > 3:
             self.customer.waited_outside = 1
+            state.total_waited_outside += 1
 
         self.customer.arrival_time = self.Time
         state.inpatients_data[self.customer.counter].append(self.customer.arrival_time)
@@ -232,6 +236,7 @@ class OutpatientArrival(DES.Event):
             state.waiting_queue.append(self.customer)
             if len(state.waiting_queue) > 3:
                 self.customer.waited_outside = 1
+                state.total_waited_outside += 1
 
             if state.free_scanners > 0:
                 startService(self.Time, self.customer)
@@ -270,6 +275,7 @@ def startService(t, customer):
         if customer.requested_office_hours and day_time[2] == state.dayTime(customer.request_time)[2]:
             if day_time[0] <= 16 * 60:
                 customer.scanned_same_office_hours = 1
+                state.total_inpatient_ssof += 1
 
         state.inpatient_scanned_same_office_hours[customer.counter] = customer.scanned_same_office_hours
 
