@@ -94,7 +94,7 @@ class EmergencyArrival(DES.Event):
             state.total_waited_outside += 1
 
         state.emergency_data[current_customer.counter].append(current_customer.waited_outside)
-        DES.insertEvent(EmergencyArrival(self.Time + random.expovariate(1/60)))
+        DES.insertEvent(EmergencyArrival(self.Time + random.expovariate(1 / 60)))
         if state.free_scanners > 0:
             startService(self.Time, current_customer)
 
@@ -177,10 +177,10 @@ class OutpatientRequest(DES.Event):
             DES.insertEvent(OutpatientRequest(next_request))
 
         elif state.dayTime(self.Time)[1] == 4:
-            DES.insertEvent(OutpatientRequest(self.Time - state.dayTime(self.Time)[0] + 1440 * 3 + 8 * 60 + np.random.exponential(23/480)))
+            DES.insertEvent(OutpatientRequest(next_request + 16 * 60 + 2 * 1440))
 
         else:
-            DES.insertEvent(OutpatientRequest(self.Time - state.dayTime(self.Time)[0] + 1440 + 8 * 60 + np.random.exponential(23/480)))
+            DES.insertEvent(OutpatientRequest(next_request + 16 * 60))
 
 
 class FridaySchedule(DES.Event):
@@ -318,7 +318,7 @@ class UpdateRunningScanners(DES.Event):
         DES.insertEvent(UpdateRunningScanners(self.Time + 8 * 60))
 
 
-DES.insertEvent(EmergencyArrival(random.expovariate(1/60)))
+DES.insertEvent(EmergencyArrival(random.expovariate(1 / 60)))
 DES.insertEvent(InpatientRequest(random.expovariate(1/160)))
 DES.insertEvent(OutpatientRequest(8 * 60 + random.expovariate(23/480)))
 DES.insertEvent(FridaySchedule(5 * 1440 - 1))
