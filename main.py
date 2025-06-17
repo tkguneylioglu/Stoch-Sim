@@ -246,6 +246,15 @@ class UpdateRunningScanners(DES.Event):
         DES.insertEvent(UpdateRunningScanners(self.Time + 8 * 60))
 
 
+class RegenerationPoint(DES.Event):
+    def execute(self):
+
+        if len(waiting_queue) == 0 and len(inpatient_queue) == 0 and occupied_scanners == 0 and outpatient_schedule[0] == 23 and not inpatient_tripping:
+            pass
+
+        DES.insertEvent(RegenerationPoint((self.Time + 1440 * 7)))
+
+
 def startService(t, customer):
     global waiting_queue, free_scanners, occupied_scanners
     customer.start_service = t
