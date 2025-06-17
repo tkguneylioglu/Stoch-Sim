@@ -1,16 +1,14 @@
 import DiscreteEventSimulation as DES
 import random
 import numpy as np
+from matplotlib import pyplot as plt
 
 
-class Customer:
-    def __init__(self, arrival_time=None, request_time=None, counter=None):
+class Customer: 
+    def __init__(self, arrival_time=None, request_time=None, start_service=None):
         self.arrival_time = arrival_time
         self.request_time = request_time
-        self.appointment_time = None
-        self.service_time = None
-        self.waited_outside = False
-        self.counter = counter
+        self.start_service = start_service
 
 
 class Emergency(Customer):
@@ -27,24 +25,16 @@ class Outpatient(Customer):
 
 class EmergencyArrival(DES.Event):
     def execute(self):
-        global waiting_queue, free_scanners, em_counter, emergency_data
+        global waiting_queue, free_scanners
 
-        current_customer = Emergency(arrival_time=self.Time, counter=em_counter)
-        em_counter += 1
-        emergency_data[current_customer.counter] = [None, None, current_customer.arrival_time]
+        current_customer = Emergency(self.Time)
         i = 0
 
-        while i < len(waiting_queue) and isinstance(waiting_queue[i], Emergency):
+        while i < len(waiting_queue) and type(waiting_queue[i]) == Emergency:
             i += 1
 
         waiting_queue.insert(i, current_customer)
-        if waiting_queue.index(current_customer) > 3:
-            current_customer.waited_outside = True
-
-        emergency_data[current_customer.counter].append(current_customer.waited_outside)
-        DES.insertEvent(EmergencyArrival(
-            self.Time + random.expovariate(1 / 60)
-        ))
+        DES.insertEvent(EmergencyArrival(self.Time + random.expovariate(1 / 60)))
 
         if free_scanners > 0:
             startService(self.Time, current_customer)
@@ -52,21 +42,25 @@ class EmergencyArrival(DES.Event):
 
 class InpatientRequest(DES.Event):
     def execute(self):
-        global inpatient_queue, waiting_queue, bed_tripping, in_counter
+        global inpatient_queue, waiting_queue, inpatient_tripping
 
-        current_customer = Inpatient(request_time=self.Time, counter=in_counter)
-        in_counter += 1
+        current_customer = Inpatient(self.Time)
+        inpatient_queue += [current_customer]
+
+        # print("At time", dayTime(self.Time))
+        # print(waiting_queue, "WAITING ROOM")
+        # print(inpatient_queue, "INPATIENTS")
+
         found = False
-        inpatient_queue.append(current_customer)
-        inpatients_data[current_customer.counter] = [current_customer.request_time, None]
 
         for i in waiting_queue:
-            if isinstance(i, Inpatient):
+            if type(i) == Inpatient:
                 found = True
                 break
 
-        if found is False and bed_tripping is False:
-            startInpatientTrip(self.Time, inpatient_queue[0])
+
+        if found == inpatient_tripping == False:
+            startInpatientTrip(self.Time)
 
         day_time = dayTime(self.Time)
 
@@ -83,59 +77,50 @@ class InpatientArrival(DES.Event):
         self.customer = customer
 
     def execute(self):
-        global waiting_queue, bed_tripping, inpatients_data
+        global waiting_queue, inpatient_tripping
 
-        waiting_queue.append(self.customer)
-        if waiting_queue.index(self.customer) > 3:
-            self.customer.waited_outside = True
+        waiting_queue += [self.customer]
+        inpatient_tripping = False
 
-        self.customer.arrival_time = self.Time
-        inpatients_data[self.customer.counter].append(self.customer.arrival_time)
-        inpatients_data[self.customer.counter].append(self.customer.waited_outside)
-        bed_tripping = False
+        # print("At time", dayTime(self.Time))
+        # print(waiting_queue, "WAITING ROOM")
+        # print(inpatient_queue, "INPATIENTS")
 
         if free_scanners > 0:
-            startService(self.Time, waiting_queue[0])
+            startService(self.Time, self.customer)
 
 
 class OutpatientRequest(DES.Event):
     def execute(self):
-        global outpatient_schedule, out_counter, outpatients_data
+        global outpatient_schedule
 
         day_time = dayTime(self.Time)
-        current_customer = Outpatient(request_time=self.Time, counter=out_counter)
-        out_counter += 1
-        outpatients_data[current_customer.counter] = [self.Time]
+        current_customer = Outpatient(request_time=self.Time)
         i = int(day_time[1]) + 1
 
         while i < 6:
             if i == 5:
-                outpatient_schedule[i].append(current_customer)
+                outpatient_schedule[i] += [current_customer]
 
             elif outpatient_schedule[i] < 28:
                 outpatient_schedule[i] += 1
 
                 if outpatient_schedule[i] <= 16:
-                    appointment_time = self.Time - day_time[0] + (i - day_time[1]) * 1440 + 8 * 60 + (outpatient_schedule[i] - 1) * 15
-                    outpatients_data[current_customer.counter].append(appointment_time)
-                    outpatient_access_times[current_customer.counter] = dayTime(appointment_time)[2] - dayTime(current_customer.request_time)[2]
-                    DES.insertEvent(OutpatientArrival(
-                        appointment_time, current_customer
-                    ))
+                    arrival_time = self.Time - day_time[0] + (i - day_time[1]) * 1440 + 8 * 60 + (outpatient_schedule[i] - 1) * 15
+                    DES.insertEvent(OutpatientArrival(arrival_time, current_customer))
 
                 else:
-                    appointment_time = self.Time - day_time[0] + (i - day_time[1]) * 1440 + 12 * 60 + (outpatient_schedule[i] - 1) * 20
-                    outpatients_data[current_customer.counter].append(appointment_time)
-                    outpatient_access_times[current_customer.counter] = dayTime(appointment_time)[2] - dayTime(current_customer.request_time)[2]
-                    DES.insertEvent(OutpatientArrival(
-                        appointment_time, current_customer
-                    ))
+                    arrival_time = self.Time - day_time[0] + (i - day_time[1]) * 1440 + 12 * 60 + (outpatient_schedule[i] - 17) * 20
+                    DES.insertEvent(OutpatientArrival(arrival_time, current_customer))
 
                 break
 
             i += 1
 
         next_request = self.Time + random.expovariate(23/480)
+        # print("At time", dayTime(self.Time))
+        # print(outpatient_schedule)
+
         if 480 <= dayTime(next_request)[0] <= 960:
             DES.insertEvent(OutpatientRequest(next_request))
 
@@ -144,54 +129,6 @@ class OutpatientRequest(DES.Event):
 
         else:
             DES.insertEvent(OutpatientRequest(self.Time - dayTime(self.Time)[0] + 1440 + 8 * 60 + np.random.exponential(23/480)))
-
-
-class FridaySchedule(DES.Event):
-    def execute(self):
-        global outpatient_schedule
-
-        day_time = dayTime(self.Time)
-
-        for j in range(5):
-            outpatient_schedule[j] = 0
-
-        superbreak = False
-        while len(outpatient_schedule[-1]) > 0:
-            if superbreak:
-                break
-
-            i = 0
-            current_customer = outpatient_schedule[-1].pop(0)
-
-            while i < 6:
-
-                if i == 5:
-                    superbreak = True
-                    break
-
-                elif outpatient_schedule[i] < 28:
-                    outpatient_schedule[i] += 1
-
-                    if outpatient_schedule[i] <= 16:
-                        appointment_time = self.Time - day_time[0] + (i + 3) * 1440 + 8 * 60 + (outpatient_schedule[i] - 1) * 15
-                        outpatients_data[current_customer.counter].append(appointment_time)
-                        outpatient_access_times[current_customer.counter] = dayTime(appointment_time)[2] - dayTime(current_customer.request_time)[2]
-                        DES.insertEvent(OutpatientArrival(
-                            appointment_time, current_customer
-                        ))
-
-                    else:
-                        appointment_time = self.Time - day_time[0] + (i + 3) * 1440 + 12 * 60 + (outpatient_schedule[i] - 1) * 20
-                        outpatients_data[current_customer.counter].append(appointment_time)
-                        outpatient_access_times[current_customer.counter] = dayTime(appointment_time)[2] - dayTime(current_customer.request_time)[2]
-                        DES.insertEvent(OutpatientArrival(
-                            appointment_time, current_customer
-                        ))
-
-                    break
-
-                i += 1
-        DES.insertEvent(FridaySchedule(self.Time + 7 * 1440))
 
 
 class OutpatientArrival(DES.Event):
@@ -206,21 +143,23 @@ class OutpatientArrival(DES.Event):
 
         if arrival_decision:
             self.customer.arrival_time = self.Time
-            waiting_queue.append(self.customer)
-            if waiting_queue.index(self.customer) > 3:
-                self.customer.waited_outside = True
+            waiting_queue += [self.customer]
+            # print("At time", dayTime(self.Time))
+            # print(waiting_queue, "WAITING ROOM")
+            # print(inpatient_queue, "INPATIENTS")
 
             if free_scanners > 0:
                 startService(self.Time, self.customer)
 
-        else:
-            self.customer.waited_outside = None
-
-        outpatients_data[self.customer.counter].append(self.customer.arrival_time)
-        outpatients_data[self.customer.counter].append(self.customer.waited_outside)
+        outpatients_data[outpatient_number] = self.customer
+        outpatient_number += 1
 
 
 class Departure(DES.Event):
+    def __init__(self, tm, customer):
+        super().__init__(tm)
+        self.customer = customer
+
     def execute(self):
         global waiting_queue, free_scanners, occupied_scanners
         free_scanners += 1
@@ -229,40 +168,111 @@ class Departure(DES.Event):
         while runningScanners(self.Time) < free_scanners + occupied_scanners:
             free_scanners -= 1
 
-        if runningScanners(self.Time) > free_scanners + occupied_scanners:
-            free_scanners = runningScanners(self.Time) - occupied_scanners
-
         if len(waiting_queue) > 0 and free_scanners > 0:
             startService(self.Time, waiting_queue[0])
 
 
+class FridaySchedule(DES.Event):
+    def execute(self):
+        global outpatient_schedule
+
+        day_time = dayTime(self.Time)
+
+        for j in range(5):
+            outpatient_schedule[j] = 0
+
+        superbreak = False
+
+        while len(outpatient_schedule[-1]) > 0:
+
+            i = 0
+
+            if superbreak:
+                break
+
+            current_customer = outpatient_schedule[-1].pop(0)
+
+            while i < 6:
+
+                if i == 5:
+                    superbreak = True
+                    break
+
+                elif outpatient_schedule[i] < 28:
+                    outpatient_schedule[i] += 1
+
+                    if outpatient_schedule[i] <= 16:
+                        arrival_time = self.Time - day_time[0] + (i + 3) * 1440 + 8 * 60 + (outpatient_schedule[i] - 1) * 15
+                        DES.insertEvent(OutpatientArrival(arrival_time, current_customer))
+
+                    else:
+                        arrival_time = self.Time - day_time[0] + (i + 3) * 1440 + 12 * 60 + (outpatient_schedule[i] - 17) * 20
+                        DES.insertEvent(OutpatientArrival(arrival_time, current_customer))
+
+                    break
+
+                i += 1
+
+        DES.insertEvent(FridaySchedule(self.Time + 7 * 1440))
+
+
+class UpdateRunningScanners(DES.Event):
+    def execute(self):
+        global free_scanners, outpatient_schedule
+
+        # print("NEW DAY", dayTime(self.Time)[1])
+
+        if runningScanners(self.Time) > free_scanners + occupied_scanners:
+
+            free_scanners = runningScanners(self.Time) - occupied_scanners
+
+            if len(waiting_queue) > free_scanners:
+                for i in range(free_scanners):
+                    startService(self.Time + i, waiting_queue[i])
+
+            else:
+                for i in range(len(waiting_queue)):
+                    startService(self.Time + i, waiting_queue[i])
+
+        elif runningScanners(self.Time) < free_scanners + occupied_scanners:
+
+            while runningScanners(self.Time) < free_scanners + occupied_scanners:
+                free_scanners -= 1
+
+        if len(waiting_queue) == 0 and len(inpatient_queue) == 0 and occupied_scanners == 0 and outpatient_schedule[0] == 23 and dayTime(self.Time)[1] == 0 and dayTime(self.Time)[0] == 8 * 60 and not inpatient_tripping:
+            regenerationPoint(self.Time)
+            print("Found")
+
+        DES.insertEvent(UpdateRunningScanners(self.Time + 8 * 60))
+
+
 def startService(t, customer):
-    global waiting_queue, free_scanners, occupied_scanners, emergency_waiting_times, outpatient_waiting_times
+    global waiting_queue, free_scanners, occupied_scanners
+    customer.start_service = t
     service_time = random.uniform(10, 19)
     waiting_queue.pop(0)
     free_scanners -= 1
     occupied_scanners += 1
 
+    # print("At time", dayTime(t))
+    # print(waiting_queue, "WAITING ROOM")
+    # print(inpatient_queue, "INPATIENTS")
+
+
     if isinstance(customer, Inpatient):
         if len(inpatient_queue) > 0:
-            startInpatientTrip(t, inpatient_queue[0])
+            startInpatientTrip(t)
 
-    elif isinstance(customer, Emergency):
-        emergency_waiting_times[customer.counter] = t - customer.arrival_time
-
-    else:
-        outpatient_waiting_times[customer.counter] = t - customer.arrival_time
-
-    DES.insertEvent(Departure(t + service_time))
+    DES.insertEvent(Departure(t + service_time, customer))
 
 
-def startInpatientTrip(t, customer):
-    global inpatient_queue, bed_tripping
+def startInpatientTrip(t):
+    global inpatient_queue, inpatient_tripping
     service_time = random.uniform(9, 15)
-    inpatient_queue.pop(0)
-    bed_tripping = True
+    current_customer = inpatient_queue.pop(0)
+    inpatient_tripping = True
 
-    DES.insertEvent(InpatientArrival(t + service_time, customer))
+    DES.insertEvent(InpatientArrival(t + service_time, current_customer))
 
 
 def runningScanners(t):
@@ -284,30 +294,51 @@ def f(x):
 
 
 def stopping_criterium():
-    return DES.currSimTime >= 14 * 1440
+    return outpatient_schedule[1] == 28
+
+
+def regenerationPoint(t):
+    pass
+
+
+def after_every_event():
+    global inpatient_queue, waiting_queue, outpatient_schedule
+    # print("inpatient queue: ", inpatient_queue)
+    # print("waiting queue: ", waiting_queue)
+    # print("outpatient schedule: ", outpatient_schedule)
+    # print("----------------")
 
 
 t0 = 0
 inpatient_queue = []
 waiting_queue = []
-outpatient_schedule = [0 for _ in range(5)]
-outpatient_schedule += [[]]
+outpatient_schedule = [0 for _ in range(5)] + [[]]
 free_scanners = runningScanners(t0)
 occupied_scanners = 0
-bed_tripping = False
-outpatients_data = {}  # [request time, appointment time, arrival time, waited outside]
-inpatients_data = {}   # [request time, appointment time, arrival time, waited outside]
-emergency_data = {}    # [request time, appointment time, arrival time, waited outside]
-emergency_waiting_times = {}
-outpatient_waiting_times = {}
-outpatient_access_times = {}
-out_counter = 1
-in_counter = 1
-em_counter = 1
+inpatient_tripping = False
+outpatients_data = {}
+outpatient_number = 1
+
 
 
 DES.insertEvent(EmergencyArrival(0))
 DES.insertEvent(InpatientRequest(0))
 DES.insertEvent(OutpatientRequest(8 * 60))
 DES.insertEvent(FridaySchedule(5 * 1440 - 1))
-DES.runSimulation(StopCriterium=stopping_criterium)
+DES.insertEvent(UpdateRunningScanners(8 * 60))
+DES.runSimulation(ExecuteAfterEveryEvent=after_every_event)
+
+print(outpatients_data)
+
+
+arrivals = []
+
+
+for customer in outpatients_data.values():
+    if customer.arrival_time is None:
+        arrivals += [None]
+
+    else:
+        arrivals += [dayTime(customer.arrival_time)[0]]
+
+print(arrivals)
