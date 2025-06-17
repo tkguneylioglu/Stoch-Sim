@@ -159,7 +159,7 @@ class OutpatientRequest(DES.Event):
                     appointment_time = self.Time - day_time[0] + (i - day_time[1]) * 1440 + 8 * 60 + (state.outpatient_schedule[i] - 1) * 15
 
                 else:
-                    appointment_time = self.Time - day_time[0] + (i - day_time[1]) * 1440 + 12 * 60 + (state.outpatient_schedule[i] - 1) * 20
+                    appointment_time = self.Time - day_time[0] + (i - day_time[1]) * 1440 + 12 * 60 + (state.outpatient_schedule[i] - 17) * 20
 
                 state.outpatients_data[current_customer.counter].append(appointment_time)
                 state.outpatient_access_times[current_customer.counter] = state.dayTime(appointment_time)[2] - state.dayTime(current_customer.request_time)[2]
@@ -210,7 +210,7 @@ class FridaySchedule(DES.Event):
                         appointment_time = self.Time - day_time[0] + (i + 3) * 1440 + 8 * 60 + (state.outpatient_schedule[i] - 1) * 15
 
                     else:
-                        appointment_time = self.Time - day_time[0] + (i + 3) * 1440 + 12 * 60 + (state.outpatient_schedule[i] - 1) * 20
+                        appointment_time = self.Time - day_time[0] + (i + 3) * 1440 + 12 * 60 + (state.outpatient_schedule[i] - 17) * 20
 
                     state.outpatients_data[current_customer.counter].append(appointment_time)
                     state.outpatient_access_times[current_customer.counter] = state.dayTime(appointment_time)[2] - state.dayTime(current_customer.request_time)[2]
@@ -255,9 +255,6 @@ class Departure(DES.Event):
         target = state.runningScanners(self.Time)
         while target < state.free_scanners + state.occupied_scanners:
             state.free_scanners -= 1
-
-        if target > state.free_scanners + state.occupied_scanners:
-            state.free_scanners = target - state.occupied_scanners
 
         if state.waiting_queue and state.free_scanners > 0:
             startService(self.Time, state.waiting_queue[0])
