@@ -94,7 +94,7 @@ class EmergencyArrival(DES.Event):
             state.total_waited_outside += 1
 
         state.emergency_data[current_customer.counter].append(current_customer.waited_outside)
-        DES.insertEvent(EmergencyArrival(self.Time + random.expovariate(1 / 60)))
+        DES.insertEvent(EmergencyArrival(self.Time + random.expovariate(1/60)))
         if state.free_scanners > 0:
             startService(self.Time, current_customer)
 
@@ -318,9 +318,9 @@ class UpdateRunningScanners(DES.Event):
         DES.insertEvent(UpdateRunningScanners(self.Time + 8 * 60))
 
 
-DES.insertEvent(EmergencyArrival(0))
-DES.insertEvent(InpatientRequest(0))
-DES.insertEvent(OutpatientRequest(8 * 60))
+DES.insertEvent(EmergencyArrival(random.expovariate(1/60)))
+DES.insertEvent(InpatientRequest(random.expovariate(1/160)))
+DES.insertEvent(OutpatientRequest(8 * 60 + random.expovariate(23/480)))
 DES.insertEvent(FridaySchedule(5 * 1440 - 1))
 DES.insertEvent(UpdateRunningScanners(8 * 60))
 DES.runSimulation(StopCriterium=stopping_criterium)
