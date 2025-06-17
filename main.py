@@ -8,7 +8,7 @@ class Customer:
         self.arrival_time = arrival_time
         self.request_time = request_time
         self.appointment_time = None
-        self.service_time = None
+        self.waiting_time = None
         self.waited_outside = 0
         self.counter = counter
 
@@ -49,6 +49,7 @@ class State:
         self.inpatient_scanned_same_office_hours = {}
         self.total_waited_outside = 0
         self.total_inpatient_ssof = 0  # scanned in the same office hour
+        self.regeneration_points = []
 
         # Counters
         self.out_counter = 1
@@ -106,7 +107,7 @@ class InpatientRequest(DES.Event):
         state.inpatients_data[current_customer.counter] = [current_customer.request_time, None]
 
         if state.runningScanners(self.Time) == 2:
-            current_customer.requested_office_hours = True   
+            current_customer.requested_office_hours = True
 
         found = any(isinstance(i, Inpatient) for i in state.waiting_queue)
         if not found and not state.bed_tripping:
@@ -114,7 +115,7 @@ class InpatientRequest(DES.Event):
 
         day_time = state.dayTime(self.Time)
         if day_time[0] <= 540 or day_time[0] >= 900:
-            DES.insertEvent(InpatientRequest(self.Time + random.expovariate(1 / 160)))
+            DES.insertEvent(InpatientRequest(self.Time + random.expovariate(1/160)))
 
         else:
             DES.insertEvent(InpatientRequest(self.Time + random.expovariate(f(day_time[0]))))
@@ -253,7 +254,7 @@ class Departure(DES.Event):
         state.free_scanners += 1
         state.occupied_scanners -= 1
         target = state.runningScanners(self.Time)
-        while target < state.free_scanners + state.occupied_scanners:
+        if target < state.free_scanners + state.occupied_scanners:
             state.free_scanners -= 1
 
         if state.waiting_queue and state.free_scanners > 0:
@@ -266,6 +267,8 @@ def startService(t, customer):
     state.waiting_queue.pop(0)
     state.free_scanners -= 1
     state.occupied_scanners += 1
+    waiting_time = t - customer.arrival_time
+    customer.waiting_time = waiting_time
 
     if isinstance(customer, Inpatient) and state.inpatient_queue:
         startInpatientTrip(t, state.inpatient_queue[0])
@@ -277,10 +280,10 @@ def startService(t, customer):
         state.inpatient_scanned_same_office_hours[customer.counter] = customer.scanned_same_office_hours
 
     elif isinstance(customer, Emergency):
-        state.emergency_waiting_times[customer.counter] = t - customer.arrival_time
+        state.emergency_waiting_times[customer.counter] = waiting_time
 
     elif isinstance(customer, Outpatient):
-        state.outpatient_waiting_times[customer.counter] = t - customer.arrival_time
+        state.outpatient_waiting_times[customer.counter] = waiting_time
 
     DES.insertEvent(Departure(t + service_time))
 
@@ -292,8 +295,32 @@ def startInpatientTrip(t, customer):
     DES.insertEvent(InpatientArrival(t + service_time, customer))
 
 
+class UpdateRunningScanners(DES.Event):
+    def execute(self):
+        if state.runningScanners(self.Time) > state.free_scanners + state.occupied_scanners:
+            state.free_scanners = state.runningScanners(self.Time) - state.occupied_scanners
+            if len(state.waiting_queue) > state.free_scanners:
+                for _ in range(state.free_scanners):
+                    startService(self.Time, state.waiting_queue[0])
+
+            else:
+                for _ in range(len(state.waiting_queue)):
+                    startService(self.Time, state.waiting_queue[0])
+
+        elif state.runningScanners(self.Time) < state.free_scanners + state.occupied_scanners:
+            while state.runningScanners(self.Time) < state.free_scanners + state.occupied_scanners and state.free_scanners > 0:
+                state.free_scanners -= 1
+
+        if len(state.waiting_queue) == 0 and len(state.inpatient_queue) == 0 and state.occupied_scanners == 0 and state.outpatient_schedule[0] == 23 and state.dayTime(self.Time)[1] == 0 and state.dayTime(self.Time)[0] == 8 * 60 and not state.bed_tripping:
+            state.regeneration_points.append(self.Time)
+            print("Found")
+
+        DES.insertEvent(UpdateRunningScanners(self.Time + 8 * 60))
+
+
 DES.insertEvent(EmergencyArrival(0))
 DES.insertEvent(InpatientRequest(0))
 DES.insertEvent(OutpatientRequest(8 * 60))
 DES.insertEvent(FridaySchedule(5 * 1440 - 1))
+DES.insertEvent(UpdateRunningScanners(8 * 60))
 DES.runSimulation(StopCriterium=stopping_criterium)
