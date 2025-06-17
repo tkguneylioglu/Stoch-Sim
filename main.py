@@ -114,7 +114,7 @@ class InpatientRequest(DES.Event):
             startInpatientTrip(self.Time, state.inpatient_queue[0])
 
         day_time = state.dayTime(self.Time)
-        if day_time[0] <= 540 or day_time[0] >= 900:
+        if day_time[0] <= 540 or day_time[0] >= 900 or day_time[1] >= 5:
             DES.insertEvent(InpatientRequest(self.Time + random.expovariate(1/160)))
 
         else:
